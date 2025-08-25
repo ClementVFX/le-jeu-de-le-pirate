@@ -25,13 +25,15 @@
   .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.12);color:var(--white)}
   .add-full{margin-top:8px;display:block;width:100%;text-align:center}
   .actions{display:flex;gap:8px;margin-top:12px}
+  .btn.add-full {display:block;width:100%;padding:12px;border-radius:12px;border:2px dashed rgba(255,255,255,0.08);background:transparent;color:var(--accent);font-weight:800;cursor:pointer;}
+  .btn.add-full:hover { background: rgba(255,255,255,0.02); }
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h2>Créer une partie</h2>
-      <div class="small">Ajoute les joueurs (minimum 2). Le deck est de 66 cartes (modifiable dans le script).</div>
+      <div class="small">Ajoute les joueurs (minimum 2).</div>
 
       <div class="players" id="players"></div>
       <button id="addBtn" class="btn add-full">+ Ajouter un joueur</button>
@@ -54,6 +56,27 @@ const startBtn = document.getElementById('startBtn');
 
 let players = [];
 
+// helper : active/desactive start si doublon ou nom vide
+function checkStartEnabled(){
+  const names = players.map(p => (p.name || '').trim());
+  const hasEmpty = names.some(n => n === '');
+  // detect duplicates (case-insensitive)
+  const lowered = names.map(n => n.toLowerCase());
+  const hasDup = lowered.some((n,i) => n && lowered.indexOf(n) !== i);
+  // disable start if empty or duplicate
+  startBtn.disabled = hasEmpty || hasDup;
+  startBtn.classList.toggle('disabled', startBtn.disabled);
+  // optionally show hint
+  let hint = document.getElementById('createHint');
+  if (!hint){
+    hint = document.createElement('div'); hint.id = 'createHint'; hint.style.marginTop='8px'; hint.style.color='lightyellow';
+    document.querySelector('.card').appendChild(hint);
+  }
+  if (hasEmpty) hint.textContent = 'Noms vides détectés — remplis tous les noms.';
+  else if (hasDup) hint.textContent = 'Deux joueurs ont le même nom — renomme l’un d’eux.';
+  else hint.textContent = '';
+}
+
 function addPlayer(name=''){
   const id = 'p_'+Math.random().toString(36).slice(2,8);
   players.push({id, name: name || ''});
@@ -69,7 +92,7 @@ function render(){
   players.forEach((p,i)=>{
     const row = document.createElement('div'); row.className='row';
     const input = document.createElement('input'); input.placeholder='Nom du joueur'; input.value=p.name;
-    input.addEventListener('input', e=>{ p.name = e.target.value; });
+    input.addEventListener('input', e=>{ p.name = e.target.value; checkStartEnabled(); });
     const minus = document.createElement('button'); minus.className='btn ghost'; minus.textContent='−';
     minus.disabled = players.length<=2;
     minus.title = 'Supprimer';
@@ -77,6 +100,8 @@ function render(){
     row.appendChild(input); row.appendChild(minus);
     playersEl.appendChild(row);
   });
+  // after render, check start
+  checkStartEnabled();
 }
 addPlayer('Joueur 1'); addPlayer('Joueur 2');
 
@@ -85,6 +110,10 @@ addBtn.addEventListener('click', ()=> addPlayer());
 startBtn.addEventListener('click', ()=>{
   const final = players.map(p=>({id:p.id, name:(p.name||'Joueur').trim(), score:0}));
   if (final.filter(p=>p.name).length < 2){ alert('Ajoute au moins 2 joueurs.'); return; }
+  // safety: re-check duplicates before starting
+  const names = final.map(p=>p.name.toLowerCase());
+  const dup = names.some((n,i)=> n && names.indexOf(n)!==i);
+  if (dup) { alert('Renomme les joueurs pour qu\'ils soient uniques.'); return; }
   const totalRounds = Math.min(10, Math.floor(DECK_SIZE / Math.max(1, final.length)));
   const game = { players:final, currentRound:1, totalRounds, subphase:'bids', savedBids:{} };
   localStorage.setItem(LS_GAME, JSON.stringify(game));

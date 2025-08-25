@@ -29,6 +29,10 @@
   .btn{padding:12px;border-radius:12px;border:0;background:var(--accent);color:#021026;font-weight:800;cursor:pointer}
   .btn.disabled{background:var(--disabled);color:#cbd5e1;cursor:not-allowed}
   .abo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center}
+  /* bouton retour (visuellement différent) */
+  .btn.ghost-secondary {background: transparent;border: 2px solid rgba(255,255,255,0.06);color: var(--white);font-weight:800;padding:10px 12px;border-radius:12px;}
+  .btn.primary { background: var(--accent); color:#021026; font-weight:900; }
+  .btn.disabled { background: var(--disabled); color:#cbd5e1; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -74,6 +78,15 @@ function render(){
   const phase = subphase();
   content.innerHTML = '';
 
+  const phaseTitle = document.createElement('div');
+  phaseTitle.style.fontSize = '18px';
+  phaseTitle.style.fontWeight = '900';
+  phaseTitle.style.marginBottom = '10px';
+  if (phase === 'bids') phaseTitle.textContent = 'CHOISISSEZ VOS PARIS';
+  else if (phase === 'ready') phaseTitle.textContent = "À L'ABORDAGE — Prêt ?"
+  else phaseTitle.textContent = 'ENTREZ LES PLIS RÉALISÉS';
+  content.appendChild(phaseTitle);
+
   if (phase === 'bids'){
     // Phase PARIS
     const playersBox = document.createElement('div'); playersBox.className='players';
@@ -109,8 +122,8 @@ function render(){
   } else if (phase === 'ready'){
     // Page intermédiaire "À L'ABORDAGE"
     const abo = document.createElement('div'); abo.className='abo';
-    const t = document.createElement('div'); t.innerHTML = '<h3 style="margin:0">À L’ABORDAGE !</h3><div class="muted">Les paris sont verrouillés. Quand le pli est terminé, entre les plis réalisés.</div>';
-    const go = document.createElement('button'); go.className='btn'; go.textContent='Entrer les plis réalisés';
+    const t = document.createElement('div'); t.innerHTML = '<h3 style="margin:0">À L’ABORDAGE !</h3><div class="muted">Les paris sont verrouillés. Jouez les manches dès à présent.</div>';
+    const go = document.createElement('button'); go.className='btn'; go.textContent='Entrer les points';
     go.onclick = ()=>{ game.subphase='made'; saveGame(game); render(); };
     const back = document.createElement('button'); back.className='btn'; back.textContent='Modifier les paris';
     back.onclick = ()=>{ delete game.savedBids[game.currentRound]; game.subphase='bids'; saveGame(game); render(); };
@@ -136,9 +149,9 @@ function render(){
     content.appendChild(playersBox);
 
     const actions = document.createElement('div'); actions.className='actions';
-    const back = document.createElement('button'); back.className='btn'; back.textContent='Retour (paris)';
+    const back = document.createElement('button'); back.className='btn ghost-secondary'; back.textContent='Retour (paris)';
     back.onclick = ()=>{ game.subphase='bids'; delete game.savedBids[game.currentRound]; saveGame(game); render(); };
-    const valid = document.createElement('button'); valid.id='vbtn'; valid.className='btn disabled'; valid.textContent='Valider les plis';
+    const valid = document.createElement('button'); valid.id='vbtn'; valid.className='btn primary disabled'; valid.textContent='Valider les plis';
     valid.disabled = true;
     valid.onclick = ()=>{
       if (valid.disabled) return;
