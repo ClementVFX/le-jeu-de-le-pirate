@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Manches — Skull King</title>
+<style>
+  :root{--bg:#071428;--card:rgba(255,255,255,0.03);--accent:#0ea5e9;--muted:#9ca3af;--white:#eef2ff;--disabled:rgba(255,255,255,0.06)}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#041226,#071430);font-family:system-ui;color:var(--white);padding:14px}
+  .wrap{max-width:900px;margin:0 auto}
+  .card{background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  h2{margin:0;font-size:18px}
+  .muted{color:var(--muted);font-size:13px}
+  .players{display:flex;flex-direction:column;gap:10px}
+  .player{display:flex;align-items:center;gap:12px;padding:8px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+  .name{flex:1;font-weight:700}
+  .btns{display:flex;gap:6px;flex-wrap:wrap}
+  .valbtn{padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--white);cursor:pointer;font-weight:700}
+  .valbtn.active{background:var(--accent);color:#021026}
+  .validate{margin-top:12px;display:flex;gap:8px;justify-content:flex-end}
+  .validate .btn{padding:10px 12px;border-radius:8px;border:0;background:var(--accent);color:#021026;font-weight:800}
+  .validate .btn.disabled{background:var(--disabled);color:#9ca3af;cursor:not-allowed}
+  .hint{margin-top:10px;color:var(--muted);font-size:13px}
+  @media(max-width:600px){ .btns{gap:6px} .valbtn{padding:8px 12px} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <h2 id="headerRound">Manche</h2>
+        <div class="muted" id="roundInfo"></div>
+      </div>
+
+      <div id="playersArea" class="players"></div>
+
+      <div class="validate">
+        <button id="backBtn" class="btn ghost">Revenir</button>
+        <button id="validateBtn" class="btn">Valider</button>
+      </div>
+
+      <div class="hint">Les boutons 0..N servent à sélectionner le pari / le nombre de plis. Le bouton "Valider" reste grisé tant que la somme des plis ≠ numéro de la manche.</div>
+    </div>
+  </div>
+
+<script>
+/*
+  Game page:
+  - reads game state from localStorage
+  - subphases: 'bids' (choose for each player) then 'made' (choose for each player)
+  - for both phases we display buttons 0..roundNumber
+  - validate button is enabled only when (in made phase) sum(made) === currentRound
+  - no ranking shown during the game
+  - on final validate: update players' scores, update global leaderboard (local), redirect to results.html
+*/
+const LS_GAME = 'skullking_game_v3';
+const LS_LEADER = 'skullking_leaderboard_v3';
+
+function loadGame(){ return JSON.parse(localStorage.getItem(LS_GAME) || 'null'); }
+function saveGame(g){ localStorage.setItem(LS_GAME, JSON.stringify(g)); }
+function loadLeaderboard(){ return JSON.parse(localStorage.getItem(LS_LEADER) || '{}'); }
+function saveLeaderboard(lb){ localStorage.setItem(LS_LEADER, JSON.stringify(lb)); }
+
+function computeScoreDelta(bid, made, roundNumber){
+  bid=Number(bid); made=Number(made); roundNumber=Number(roundNumber);
+  if (made === bid){
+    if (bid === 0) return roundNumber * 10;
+    return bid * 20;
+  } else {
+    if (bid === 0) return -roundNumber * 10;
+    return -Math.abs(made - bid) * 10;
+  }
+}
+
+let game = loadGame();
+if (!game || !game.players || !game.players.length) {
+  // fallback: go back to create
+  alert('Aucune partie en cours. Retour au menu de création.');
+  location.href = 'create.html';
+}
+
+const headerRound = document.getElementById('headerRound');
+const roundInfo = document.getElementById('roundInfo');
+const playersArea = document.getElementById('playersArea');
+const validateBtn = document.getElementById('validateBtn');
+const backBtn = document.getElementById('backBtn');
+
+function currentSubphase(){
+  return game.savedBids && game.savedBids[game.currentRound] ? 'made' : 'bids';
+}
+
+function render(){
+  headerRound.textContent = `Manche ${game.currentRound} / ${game.totalRounds}`;
+  roundInfo.textContent = `Joueurs: ${game.players.length}`;
+  playersArea.innerHTML = '';
+
+  const sub = currentSubphase();
+  // for each player render name + button group 0..roundNumber
+  game.players.forEach(p => {
+    const row = document.createElement('div'); row.className = 'player';
+    const name = document.createElement('div'); name.className='name'; name.textContent = p.name;
+    row.appendChild(name);
+    const btns = document.createElement('div'); btns.className = 'btns';
+    const max = game.currentRound;
+    const selected = (sub === 'bids') ? ((game.tempBids && game.tempBids[p.id]!==undefined) ? game.tempBids[p.id] : 0)
+                                     : ((game.tempMade && game.tempMade[p.id]!==undefined) ? game.tempMade[p.id] : 0);
+    for (let i=0;i<=max;i++){
+      const b = document.createElement('button');
+      b.className = 'valbtn' + (i===selected ? ' active' : '');
+      b.textContent = String(i);
+      b.addEventListener('click', ()=> {
+        if (sub === 'bids') {
+          game.tempBids = game.tempBids || {};
+          game.tempBids[p.id] = i;
+        } else {
+          game.tempMade = game.tempMade || {};
+          game.tempMade[p.id] = i;
+        }
+        saveGame(game);
+        render();
+      });
+      btns.appendChild(b);
+    }
+    row.appendChild(btns);
+    playersArea.appendChild(row);
+  });
+
+  // configure validate/back button
+  if (sub === 'bids'){
+    validateBtn.textContent = 'Valider les paris';
+    validateBtn.disabled = false;
+    validateBtn.classList.remove('disabled');
+    // clicking saves bids to savedBids and moves to made phase
+    validateBtn.onclick = ()=> {
+      game.savedBids = game.savedBids || {};
+      // ensure each player has a bid (default 0)
+      const bids = {};
+      for (const p of game.players) bids[p.id] = (game.tempBids && game.tempBids[p.id] !== undefined) ? game.tempBids[p.id] : 0;
+      game.savedBids[game.currentRound] = bids;
+      // clear tempMade if any
+      game.tempMade = {};
+      saveGame(game);
+      render();
+    };
+  } else {
+    // made phase: validate only enabled when sum(made) === currentRound
+    validateBtn.textContent = 'Valider les plis';
+    // compute sum
+    let sum = 0;
+    for (const p of game.players) {
+      const v = (game.tempMade && game.tempMade[p.id] !== undefined) ? game.tempMade[p.id] : 0;
+      sum += Number(v);
+    }
+    const ok = (sum === game.currentRound);
+    validateBtn.disabled = !ok;
+    if (!ok) validateBtn.classList.add('disabled'); else validateBtn.classList.remove('disabled');
+    validateBtn.onclick = ()=> {
+      if (!ok) return;
+      // compute deltas with savedBids
+      const roundBids = (game.savedBids && game.savedBids[game.currentRound]) ? game.savedBids[game.currentRound] : {};
+      const deltas = {};
+      for (const p of game.players){
+        const b = roundBids[p.id] !== undefined ? Number(roundBids[p.id]) : 0;
+        const m = game.tempMade && game.tempMade[p.id] !== undefined ? Number(game.tempMade[p.id]) : 0;
+        deltas[p.id] = computeScoreDelta(b, m, game.currentRound);
+      }
+      // apply
+      game.players = game.players.map(p => ({ ...p, score: p.score + (deltas[p.id] || 0) }));
+      // cleanup
+      if (game.savedBids) delete game.savedBids[game.currentRound];
+      game.tempBids = {};
+      game.tempMade = {};
+      // next or finish
+      if (game.currentRound >= game.totalRounds){
+        // update leaderboard totals
+        const leaderboard = loadLeaderboard();
+        game.players.forEach(p => {
+          const name = p.name || 'Joueur';
+          if (!leaderboard[name]) leaderboard[name] = { total: 0, games: 0 };
+          leaderboard[name].total += p.score;
+          leaderboard[name].games += 1;
+        });
+        saveLeaderboard(leaderboard);
+        saveGame(game); // save final scores for results page
+        location.href = 'results.html';
+        return;
+      } else {
+        game.currentRound += 1;
+        saveGame(game);
+        render();
+        return;
+      }
+    };
+  }
+
+  backBtn.onclick = ()=> {
+    // go back to create if user wants to cancel
+    if (confirm('Annuler la partie en cours et revenir à la création ?')) {
+      localStorage.removeItem(LS_GAME);
+      location.href = 'create.html';
+    }
+  };
+}
+
+// bootstrap
+render();
+</script>
+</body>
+</html>

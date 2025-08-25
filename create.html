@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Créer une partie — Skull King</title>
+<style>
+  :root{--bg:#071428;--card:rgba(255,255,255,0.03);--accent:#0ea5e9;--muted:#9ca3af;--white:#eef2ff}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#041226,#071430);font-family:system-ui;padding:18px;color:var(--white)}
+  .wrap{max-width:720px;margin:0 auto}
+  .card{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  h2{margin:0 0 8px;font-size:18px} .small{font-size:13px;color:var(--muted)}
+  .players{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+  .player-row{display:flex;gap:8px;align-items:center}
+  .player-row input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--white)}
+  .btn{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#021026;font-weight:700;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--white)}
+  .row-actions{display:flex;gap:8px;margin-top:12px}
+  .hint{margin-top:10px;color:var(--muted);font-size:13px}
+  @media(max-width:520px){ .card{padding:12px} .btn{font-size:15px} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Créer une partie</h2>
+      <div class="small">Ajoute les joueurs (au moins 2). Tu pourras modifier le deck size dans le script si nécessaire.</div>
+
+      <div style="margin-top:12px">
+        <div class="players" id="playersList"></div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="addPlayer" class="btn">Ajouter un joueur</button>
+          <button id="startGame" class="btn">Démarrer la partie</button>
+          <button id="cancel" class="btn ghost" onclick="location.href='index.html'">Annuler</button>
+        </div>
+      </div>
+
+      <div class="hint">NB : deck size = 66 cartes (modifiable dans create.html → const DECK_SIZE).</div>
+    </div>
+  </div>
+
+<script>
+/*
+  Create page script
+  - DECK_SIZE default 66 (modifie ici si besoin)
+  - add/remove players UI (min 2)
+  - on start: compute totalRounds = min(10, floor(DECK_SIZE / playersCount))
+  - save game state to localStorage and redirect to game.html
+*/
+const DECK_SIZE = 66; // ← modifie cette valeur ici si tu veux tester un autre deck size
+
+const LS_GAME = 'skullking_game_v3';
+function saveGame(obj){ localStorage.setItem(LS_GAME, JSON.stringify(obj)); }
+
+const playersList = document.getElementById('playersList');
+const addBtn = document.getElementById('addPlayer');
+const startBtn = document.getElementById('startGame');
+
+let players = [];
+
+// init with 2 players
+function addPlayer(name = '') {
+  const id = 'p_' + Math.random().toString(36).slice(2,8);
+  players.push({id, name: name || '', score: 0});
+  renderPlayers();
+}
+function removePlayer(id){
+  if (players.length <= 2) return; // min 2
+  players = players.filter(p => p.id !== id);
+  renderPlayers();
+}
+
+function renderPlayers(){
+  playersList.innerHTML = '';
+  players.forEach((p, idx) => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = p.name;
+    input.placeholder = 'Nom du joueur';
+    input.addEventListener('input', (e) => p.name = e.target.value);
+    row.appendChild(input);
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn ghost';
+    removeBtn.textContent = '-';
+    removeBtn.title = 'Supprimer ce joueur';
+    removeBtn.disabled = players.length <= 2;
+    removeBtn.addEventListener('click', ()=> removePlayer(p.id));
+    row.appendChild(removeBtn);
+    playersList.appendChild(row);
+  });
+}
+
+// initial
+addPlayer('Joueur 1');
+addPlayer('Joueur 2');
+
+addBtn.addEventListener('click', ()=> { addPlayer(''); });
+
+startBtn.addEventListener('click', ()=> {
+  const names = players.map(p => (p.name || '').trim()).filter(Boolean);
+  if (names.length < 2) return alert('Ajoute au moins 2 joueurs');
+  // make final players with ids
+  const finalPlayers = players.map(p => ({ id: p.id, name: (p.name || 'Joueur').trim(), score: 0 }));
+  const totalRounds = Math.min(10, Math.floor(DECK_SIZE / Math.max(1, finalPlayers.length)));
+  const game = {
+    players: finalPlayers,
+    currentRound: 1,
+    totalRounds,
+    savedBids: {}
+  };
+  saveGame(game);
+  // go to game page
+  location.href = 'game.html';
+});
+</script>
+</body>
+</html>

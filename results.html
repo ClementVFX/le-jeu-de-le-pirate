@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Résultats — Skull King</title>
+<style>
+  :root{--bg:#071428;--card:rgba(255,255,255,0.03);--white:#eef2ff;--muted:#9ca3af;--gold:#ffd54a;--silver:#c0c6cc;--bronze:#d9a066}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#041226,#071430);font-family:system-ui;color:var(--white);padding:14px;display:flex;align-items:center;justify-content:center}
+  .wrap{width:100%;max-width:780px}
+  .card{background:var(--card);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  h2{margin:0 0 8px}
+  .muted{color:var(--muted);font-size:13px}
+  .reveal-area{margin-top:12px;border-radius:10px;padding:12px;background:linear-gradient(180deg,rgba(255,255,255,0.015),transparent);min-height:260px;display:flex;flex-direction:column;gap:10px}
+  .reveal-card{padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);text-align:center;border:1px solid rgba(255,255,255,0.03);opacity:0.05;transform:translateY(10px)}
+  .reveal-card.visible{opacity:1;transform:translateY(0);transition:all 360ms cubic-bezier(.2,.9,.3,1)}
+  .player-name{font-weight:800}
+  .player-score{font-size:22px;margin-top:6px}
+  .podium-gold{background:linear-gradient(90deg,#fff3c4,#ffd54a); color:#111}
+  .podium-silver{background:linear-gradient(90deg,#eef0f2,#c0c6cc); color:#111}
+  .podium-bronze{background:linear-gradient(90deg,#fde9d6,#d9a066); color:#111}
+  .controls{display:flex;justify-content:center;margin-top:12px;gap:8px}
+  .btn{padding:10px 12px;border-radius:8px;border:0;background:#0ea5e9;color:#021026;font-weight:800;cursor:pointer}
+  @media(max-width:600px){ .reveal-area{min-height:55vh} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>Résultats finaux</h2>
+        <div class="muted">Tape l'écran pour révéler (du dernier au premier)</div>
+      </div>
+
+      <div id="revealArea" class="reveal-area"></div>
+
+      <div id="controls" class="controls" style="display:none">
+        <button id="replayBtn" class="btn" onclick="location.href='create.html'">Refaire une partie</button>
+        <button id="toLeaderboard" class="btn" onclick="location.href='leaderboard.html'">Leaderboard</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  Results page:
+  - loads final game from localStorage
+  - sorts players by score descending, then reveals from last -> first (so winner last)
+  - tapping the reveal area advances
+  - show podium styling for top 3 when they are revealed (applies classes)
+  - show "Refaire une partie" & Leaderboard when all revealed
+*/
+const LS_GAME = 'skullking_game_v3';
+const game = JSON.parse(localStorage.getItem(LS_GAME) || 'null');
+if (!game || !game.players) {
+  alert('Aucune partie terminée trouvée. Retour à la création.');
+  location.href = 'create.html';
+}
+
+const revealArea = document.getElementById('revealArea');
+const controls = document.getElementById('controls');
+
+// sort players descending by score
+const playersSorted = (game.players || []).slice().sort((a,b)=> b.score - a.score);
+// we reveal from LAST to FIRST => iterate from end to start
+const revealOrder = playersSorted.slice().reverse(); // lowest -> highest
+const cards = [];
+revealOrder.forEach(p => {
+  const c = document.createElement('div');
+  c.className = 'reveal-card';
+  c.innerHTML = `<div class="player-name">${escapeHtml(p.name)}</div><div class="player-score">???</div>`;
+  revealArea.appendChild(c);
+  cards.push({el:c, data:p});
+});
+
+let idx = 0;
+function revealNext(){
+  if (idx >= cards.length) return;
+  const item = cards[idx];
+  const scoreEl = item.el.querySelector('.player-score');
+  scoreEl.textContent = String(item.data.score);
+  // apply medal style if this player is in top3 of playersSorted
+  const rank = playersSorted.findIndex(pp => pp.id === item.data.id) + 1; // 1-based
+  if (rank === 1) item.el.classList.add('podium-gold');
+  else if (rank === 2) item.el.classList.add('podium-silver');
+  else if (rank === 3) item.el.classList.add('podium-bronze');
+  item.el.classList.add('visible');
+  idx++;
+  if (idx >= cards.length){
+    // show controls
+    controls.style.display = 'flex';
+    // update global leaderboard totals (already updated in game page before redirect)
+  }
+}
+
+revealArea.addEventListener('click', revealNext);
+revealArea.addEventListener('touchstart', function(){ revealNext(); }, {passive:true});
+
+// helper to avoid XSS
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+</script>
+</body>
+</html>
