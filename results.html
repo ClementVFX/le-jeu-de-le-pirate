@@ -6,87 +6,133 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e3a8a">
 <style>
-  :root{--card:rgba(255,255,255,0.06);--white:#eef2ff;--muted:#9ca3af;--gold:#ffd54a;--silver:#c0c6cc;--bronze:#d9a066}
-  *{box-sizing:border-box}
-  body{
-    margin:0;min-height:100vh;background:linear-gradient(180deg,#041226,#071430) fixed;
-    background-repeat:no-repeat;background-size:cover;background-position:center;
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--white);padding:14px;display:flex;align-items:center;justify-content:center
+  .player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    margin: 6px 0;
+    background: #f5f5f5;
+    border-radius: 10px;
+    transition: transform 0.5s ease, background 0.3s;
+    position: relative;
   }
-  .wrap{width:100%;max-width:780px}
-  .card{background:var(--card);padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08)}
-  h2{margin:0 0 8px}
-  .muted{color:var(--muted);font-size:13px}
-  .list{margin-top:12px;display:flex;flex-direction:column;gap:10px}
-  .item{padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);opacity:0.05;transform:translateY(10px)}
-  .item.visible{opacity:1;transform:translateY(0);transition:all 360ms cubic-bezier(.2,.9,.3,1)}
-  .line{display:flex;justify-content:space-between;align-items:center}
-  .name{font-weight:900}
-  .score{font-size:22px}
-  .gold{background:linear-gradient(90deg,#fff3c4,#ffd54a);color:#111}
-  .silver{background:linear-gradient(90deg,#eef0f2,#c0c6cc);color:#111}
-  .bronze{background:linear-gradient(90deg,#fde9d6,#d9a066);color:#111}
-  .controls{display:flex;justify-content:center;gap:10px;margin-top:14px}
-  .btn{padding:12px;border-radius:12px;border:0;background:#0ea5e9;color:#021026;font-weight:900;cursor:pointer}
+
+  .player.revealed {
+    background: #e8ffe8;
+  }
+
+  .player .score {
+    font-weight: bold;
+    font-size: 18px;
+  }
+
+  .crown {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 22px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .player.leader .crown {
+    opacity: 1;
+  }
+
+  #results {
+    max-width: 400px;
+    margin: 20px auto;
+  }
+
+  #revealBtn {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    border: none;
+    background: #0077cc;
+    color: white;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+  }
 </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h2>Résultats finaux</h2>
-        <div class="muted">Tape l’écran pour révéler du dernier au premier</div>
-      </div>
 
-      <div id="list" class="list"></div>
-
-      <div id="controls" class="controls" style="display:none">
-        <button class="btn" onclick="location.href='create.html'">Refaire une partie</button>
-        <button class="btn" onclick="location.href='leaderboard.html'">Leaderboard</button>
-      </div>
-    </div>
-  </div>
+<div id="results"></div>
+<button id="revealBtn">Révéler le prochain</button>
 
 <script>
-const LS_GAME = 'skullking_game_v4';
-const game = JSON.parse(localStorage.getItem(LS_GAME) || 'null');
-if (!game || !game.players){ alert('Aucune partie.'); location.href='create.html'; }
+  // Exemple de joueurs (à remplacer par tes vrais joueurs et scores)
+  const players = [
+    { name: "Alice", score: 12 },
+    { name: "Bob", score: 9 },
+    { name: "Charlie", score: 15 },
+    { name: "Diana", score: 7 }
+  ];
 
-const list = document.getElementById('list');
-const controls = document.getElementById('controls');
+  // Mélanger l'ordre initial
+  const shuffled = players
+    .map(p => ({ ...p, revealed: false }))
+    .sort(() => Math.random() - 0.5);
 
-// tri du + grand au + petit POUR L'AFFICHAGE (meilleur en haut)
-const sorted = game.players.slice().sort((a,b)=> b.score - a.score);
+  const resultsContainer = document.getElementById("results");
 
-// construire la liste (tous cachés)
-const items = sorted.map((p, idx)=>{
-  const div = document.createElement('div');
-  div.className='item';
-  const name = esc(p.name);
-  div.innerHTML = `<div class="line"><div class="name">${name}</div><div class="score">???</div></div>`;
-  list.appendChild(div);
-  return {el:div, data:p, idx};
-});
+  function renderInitial() {
+    resultsContainer.innerHTML = "";
+    shuffled.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.dataset.name = p.name;
+      div.innerHTML = `
+        <span>${p.name}</span>
+        <span class="score">?</span>
+        <div class="crown">👑</div>
+      `;
+      resultsContainer.appendChild(div);
+    });
+  }
 
-// ordre de révélation = du dernier (score le plus bas) au premier
-let revealIndex = items.length - 1; // commence par le bas visuellement
-function revealNext(){
-  if (revealIndex < 0){ return; }
-  const it = items[revealIndex];
-  it.el.querySelector('.score').textContent = String(it.data.score);
-  // médailles pour top 3 (indices 0,1,2 car tri desc)
-  if (it.idx === 0) it.el.classList.add('gold');
-  else if (it.idx === 1) it.el.classList.add('silver');
-  else if (it.idx === 2) it.el.classList.add('bronze');
-  it.el.classList.add('visible');
-  revealIndex--;
-  if (revealIndex < 0){ controls.style.display='flex'; }
-}
+  function revealNext() {
+    const next = shuffled.find(p => !p.revealed);
+    if (!next) return;
 
-document.addEventListener('click', revealNext, {passive:true});
-document.addEventListener('touchstart', revealNext, {passive:true});
+    next.revealed = true;
 
-function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    // Afficher son vrai score
+    const playerDiv = [...document.querySelectorAll(".player")]
+      .find(d => d.dataset.name === next.name);
+    playerDiv.querySelector(".score").textContent = next.score;
+    playerDiv.classList.add("revealed");
+
+    // Réinsérer correctement trié
+    reorderPlayers();
+  }
+
+  function reorderPlayers() {
+    const revealedPlayers = shuffled.filter(p => p.revealed);
+
+    // Trier seulement les révélés
+    revealedPlayers.sort((a, b) => b.score - a.score);
+
+    revealedPlayers.forEach((p, index) => {
+      const playerDiv = [...document.querySelectorAll(".player")]
+        .find(d => d.dataset.name === p.name);
+
+      resultsContainer.appendChild(playerDiv);
+
+      // Couronne uniquement au premier
+      if (index === 0) {
+        playerDiv.classList.add("leader");
+      } else {
+        playerDiv.classList.remove("leader");
+      }
+    });
+  }
+
+  document.getElementById("revealBtn").addEventListener("click", revealNext);
+
+  renderInitial();
 </script>
 </body>
 </html>
