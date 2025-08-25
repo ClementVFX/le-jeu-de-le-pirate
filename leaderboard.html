@@ -3,17 +3,24 @@
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Leaderboard — Skull King</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e3a8a">
 <style>
-  :root{--bg:#071428;--card:rgba(255,255,255,0.03);--white:#eef2ff;--muted:#9ca3af;--accent:#0ea5e9}
-  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#041226,#071430);font-family:system-ui;color:var(--white);padding:14px}
+  :root{--card:rgba(255,255,255,0.06);--white:#eef2ff;--muted:#9ca3af;--accent:#0ea5e9}
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;background:linear-gradient(180deg,#041226,#071430) fixed;
+    background-repeat:no-repeat;background-size:cover;background-position:center;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--white);padding:14px
+  }
   .wrap{max-width:840px;margin:0 auto}
-  .card{background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  .card{background:var(--card);padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08)}
   h2{margin:0 0 8px}
   table{width:100%;border-collapse:collapse;margin-top:12px}
-  th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03)}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.12)}
   .small{color:var(--muted);font-size:13px}
   .controls{display:flex;gap:8px;margin-top:12px}
-  .btn{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#021026;font-weight:800;cursor:pointer}
+  .btn{padding:12px;border-radius:12px;border:0;background:var(--accent);color:#021026;font-weight:900;cursor:pointer}
 </style>
 </head>
 <body>
@@ -21,55 +28,45 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h2>Leaderboard (local)</h2>
-        <div class="small">Scores cumulés stockés dans ton navigateur</div>
+        <div class="small">Stocké dans ton navigateur</div>
       </div>
 
-      <div id="tableWrap"></div>
+      <div id="wrapTable"></div>
 
       <div class="controls">
-        <button id="clearBtn" class="btn">Réinitialiser leaderboard</button>
+        <button id="clear" class="btn">Réinitialiser</button>
         <button onclick="location.href='index.html'" class="btn">Accueil</button>
       </div>
     </div>
   </div>
 
 <script>
-const LS_LEADER = 'skullking_leaderboard_v3';
-function loadLeaderboard(){ return JSON.parse(localStorage.getItem(LS_LEADER) || '{}'); }
-function saveLeaderboard(lb){ localStorage.setItem(LS_LEADER, JSON.stringify(lb)); }
+const LS_LEADER = 'skullking_leaderboard_v4';
+function loadLB(){ return JSON.parse(localStorage.getItem(LS_LEADER) || '{}'); }
 
 function render(){
-  const lb = loadLeaderboard();
-  const entries = Object.entries(lb).map(([name,v]) => ({ name, total: v.total || 0, games: v.games || 0 }));
+  const lb = loadLB();
+  const entries = Object.entries(lb).map(([name,v])=>({name, total:v.total||0, games:v.games||0}));
   entries.sort((a,b)=> b.total - a.total);
-  const tableWrap = document.getElementById('tableWrap');
-  tableWrap.innerHTML = '';
-  if (!entries.length) {
-    tableWrap.innerHTML = '<div class="small">Aucun score enregistré pour le moment. Joue une partie pour remplir le leaderboard.</div>';
-    return;
-  }
+  const root = document.getElementById('wrapTable'); root.innerHTML='';
+  if (!entries.length){ root.innerHTML='<div class="small">Aucun score enregistré pour l’instant.</div>'; return; }
   const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>Nom</th><th>Points</th><th>Parties</th></tr>';
-  table.appendChild(thead);
+  table.innerHTML = '<thead><tr><th>Nom</th><th>Points</th><th>Parties</th></tr></thead>';
   const tbody = document.createElement('tbody');
-  entries.forEach(e => {
+  entries.forEach(e=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(e.name)}</td><td>${e.total}</td><td>${e.games}</td>`;
+    tr.innerHTML = `<td>${esc(e.name)}</td><td>${e.total}</td><td>${e.games}</td>`;
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  tableWrap.appendChild(table);
+  root.appendChild(table);
 }
-
-document.getElementById('clearBtn').addEventListener('click', ()=>{
+document.getElementById('clear').addEventListener('click', ()=>{
   if (!confirm('Réinitialiser le leaderboard local ?')) return;
   localStorage.removeItem(LS_LEADER);
   render();
 });
-
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
-
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 render();
 </script>
 </body>
