@@ -33,6 +33,32 @@
   .btn.ghost-secondary {background: transparent;border: 2px solid rgba(255,255,255,0.06);color: var(--white);font-weight:800;padding:10px 12px;border-radius:12px;}
   .btn.primary { background: var(--accent); color:#021026; font-weight:900; }
   .btn.disabled { background: var(--disabled); color:#cbd5e1; cursor:not-allowed; }
+
+  /* interstitial big round display */
+  .round-start {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:20px;
+    padding:28px;
+  }
+  .round-number {
+    font-size:72px;
+    font-weight:900;
+    letter-spacing: -2px;
+  }
+  .round-label {
+    font-size:18px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:2px;
+  }
+
+  @media(max-width:600px){
+    .round-number{font-size:48px}
+    .choice{padding:8px 10px}
+  }
 </style>
 </head>
 <body>
@@ -85,6 +111,7 @@ function render(){
   phaseTitle.style.alignItems = 'center';
   if (phase === 'bids') phaseTitle.textContent = 'CHOISISSEZ VOS PARIS';
   else if (phase === 'ready') phaseTitle.textContent = "À L'ABORDAGE — Prêt ?"
+  else if (phase === 'round_start') phaseTitle.textContent = ''; // we will show big UI
   else phaseTitle.textContent = 'ENTREZ LES PLIS RÉALISÉS';
   content.appendChild(phaseTitle);
 
@@ -131,6 +158,32 @@ function render(){
     abo.appendChild(t); abo.appendChild(go); abo.appendChild(back);
     content.appendChild(abo);
 
+  } else if (phase === 'round_start'){
+    // NEW: interstitial page showing the next round number in very large text
+    const roundNum = game.nextRound ?? (game.currentRound + 1);
+    const box = document.createElement('div'); box.className = 'round-start';
+    const label = document.createElement('div'); label.className='round-label'; label.textContent = 'Prochaine manche';
+    const big = document.createElement('div'); big.className='round-number'; big.textContent = `#${roundNum}`;
+    const startBtn = document.createElement('button'); startBtn.className='btn primary'; startBtn.textContent = `Commencer la manche ${roundNum}`;
+    startBtn.onclick = ()=> {
+      // set currentRound to nextRound and go to bids phase
+      game.currentRound = roundNum;
+      game.subphase = 'bids';
+      // clear temp selections to avoid carryover
+      game.tempBids = {}; game.tempMade = {};
+      saveGame(game);
+      render();
+    };
+    const back = document.createElement('button'); back.className='btn ghost-secondary'; back.textContent = 'Annuler et revenir au score final';
+    back.onclick = ()=> {
+      // if user cancels, go to results — or you may prefer to go back to previous page: here we'll go to bids of current round
+      game.subphase = 'bids';
+      saveGame(game);
+      render();
+    };
+    box.appendChild(label); box.appendChild(big); box.appendChild(startBtn); box.appendChild(back);
+    content.appendChild(box);
+
   } else {
     // Phase PLIS RÉALISÉS
     const playersBox = document.createElement('div'); playersBox.className='players';
@@ -166,7 +219,7 @@ function render(){
       // cleanup et suite
       delete game.savedBids[game.currentRound];
       game.tempBids = {}; game.tempMade = {};
-      game.subphase = 'bids';
+      // If it was last round -> finalize and go to results
       if (game.currentRound >= game.totalRounds){
         // maj leaderboard
         const lb = loadLB();
@@ -180,7 +233,9 @@ function render(){
         location.href='results.html';
         return;
       } else {
-        game.currentRound += 1;
+        // Otherwise: set up next round interstitial
+        game.nextRound = game.currentRound + 1;
+        game.subphase = 'round_start';
         saveGame(game);
         render();
       }
