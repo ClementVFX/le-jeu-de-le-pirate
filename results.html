@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Résultats — Skull King</title>
+<title>Résultats — PirateFx</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e3a8a">
 <style>
@@ -78,7 +78,7 @@
   - when all revealed: apply medals and crown on winner
 */
 
-const LS_GAME = 'skullking_game_v4';
+const LS_GAME = 'skullking_game_v0.21';
 const game = JSON.parse(localStorage.getItem(LS_GAME) || 'null');
 if (!game || !Array.isArray(game.players) || game.players.length === 0) {
   alert('Aucune partie trouvée. Retour à la création.');

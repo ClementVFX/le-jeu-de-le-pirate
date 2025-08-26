@@ -1,6 +1,6 @@
 {
-  "name": "Skull King Fx",
-  "short_name": "SkullKing",
+  "name": "PirateFx",
+  "short_name": "PirateFx",
   "description": "Application de score pour Skull King",
   "start_url": "/index.html",
   "display": "standalone",
