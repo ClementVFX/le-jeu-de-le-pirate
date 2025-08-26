@@ -6,133 +6,233 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e3a8a">
 <style>
-  .player {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    margin: 6px 0;
-    background: #f5f5f5;
-    border-radius: 10px;
-    transition: transform 0.5s ease, background 0.3s;
-    position: relative;
+  :root{--card:rgba(255,255,255,0.06);--white:#eef2ff;--muted:#9ca3af;--gold:#ffd54a;--silver:#c0c6cc;--bronze:#d9a066}
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;background:linear-gradient(180deg,#041226,#071430) fixed;
+    background-repeat:no-repeat;background-size:cover;background-position:center;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--white);padding:14px;display:flex;align-items:center;justify-content:center
   }
-
-  .player.revealed {
-    background: #e8ffe8;
-  }
-
-  .player .score {
-    font-weight: bold;
-    font-size: 18px;
-  }
-
+  .wrap{width:100%;max-width:780px}
+  .card{background:var(--card);padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08)}
+  h2{margin:0 0 8px}
+  .muted{color:var(--muted);font-size:13px}
+  .list{margin-top:12px;display:flex;flex-direction:column;gap:10px; position:relative}
+  /* item base style (kept visually consistent) */
+  .item{padding:12px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+        opacity:0.06; transform:translateY(10px); display:flex;justify-content:space-between;align-items:center; position:relative;}
+  .item.visible{opacity:1;transform:translateY(0);transition:all 360ms cubic-bezier(.2,.9,.3,1)}
+  .line{display:flex;align-items:center;gap:12px}
+  .name{font-weight:900}
+  .score{font-size:22px;font-weight:800}
+  /* medals (kept from your file) */
+  .gold{background:linear-gradient(90deg,#fff3c4,#ffd54a);color:#111}
+  .silver{background:linear-gradient(90deg,#eef0f2,#c0c6cc);color:#111}
+  .bronze{background:linear-gradient(90deg,#fde9d6,#d9a066);color:#111}
+  /* crown (shown once all revealed on the top player) */
   .crown {
-    position: absolute;
-    top: -18px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 22px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    position:absolute;
+    top:-18px;
+    left:16px;
+    font-size:20px;
+    transform:translateY(-6px);
+    opacity:0;
+    transition:opacity 260ms ease, transform 260ms ease;
+    pointer-events:none;
   }
-
-  .player.leader .crown {
-    opacity: 1;
-  }
-
-  #results {
-    max-width: 400px;
-    margin: 20px auto;
-  }
-
-  #revealBtn {
-    display: block;
-    margin: 20px auto;
-    padding: 10px 20px;
-    border: none;
-    background: #0077cc;
-    color: white;
-    font-weight: bold;
-    border-radius: 8px;
-    cursor: pointer;
-  }
+  .item.has-crown .crown { opacity:1; transform:translateY(0); }
+  /* leader highlight when revealed (subtle) */
+  .item.revealed { box-shadow:0 6px 18px rgba(0,0,0,0.25); }
+  /* controls */
+  .controls{display:flex;justify-content:center;gap:10px;margin-top:14px}
+  .btn{padding:12px;border-radius:12px;border:0;background:#0ea5e9;color:#021026;font-weight:900;cursor:pointer}
+  /* small responsive tweak */
+  @media(max-width:600px){ .item{padding:10px} .score{font-size:20px} .crown{left:10px} }
 </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>Résultats finaux</h2>
+        <div class="muted">Tape l’écran pour révéler — l’ordre initial est aléatoire</div>
+      </div>
 
-<div id="results"></div>
-<button id="revealBtn">Révéler le prochain</button>
+      <div id="list" class="list" aria-live="polite"></div>
+
+      <div id="controls" class="controls" style="display:none">
+        <button class="btn" onclick="location.href='create.html'">Refaire une partie</button>
+        <button class="btn" onclick="location.href='leaderboard.html'">Leaderboard</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-  // Exemple de joueurs (à remplacer par tes vrais joueurs et scores)
-  const players = [
-    { name: "Alice", score: 12 },
-    { name: "Bob", score: 9 },
-    { name: "Charlie", score: 15 },
-    { name: "Diana", score: 7 }
-  ];
+/*
+  results.html
+  - reads game from localStorage key 'skullking_game_v4'
+  - initial display = shuffled for suspense
+  - reveal order = ascending by score (lowest revealed first)
+  - on reveal: show score and insert into revealed block at correct position (descending)
+  - FLIP animation for movement
+  - when all revealed: apply medals and crown on winner
+*/
 
-  // Mélanger l'ordre initial
-  const shuffled = players
-    .map(p => ({ ...p, revealed: false }))
-    .sort(() => Math.random() - 0.5);
+const LS_GAME = 'skullking_game_v4';
+const game = JSON.parse(localStorage.getItem(LS_GAME) || 'null');
+if (!game || !Array.isArray(game.players) || game.players.length === 0) {
+  alert('Aucune partie trouvée. Retour à la création.');
+  location.href = 'create.html';
+}
 
-  const resultsContainer = document.getElementById("results");
+const list = document.getElementById('list');
+const controls = document.getElementById('controls');
 
-  function renderInitial() {
-    resultsContainer.innerHTML = "";
-    shuffled.forEach(p => {
-      const div = document.createElement("div");
-      div.className = "player";
-      div.dataset.name = p.name;
-      div.innerHTML = `
-        <span>${p.name}</span>
-        <span class="score">?</span>
-        <div class="crown">👑</div>
-      `;
-      resultsContainer.appendChild(div);
-    });
+// helpers to identify players (use id if present, else name)
+function pid(p){ return p.id ?? p.name; }
+
+// shuffle for initial visual order
+function shuffle(arr){ return arr.slice().sort(()=>Math.random()-0.5); }
+
+// Build two orders:
+// displayOrder: shuffled (visual positions when hidden)
+// revealOrder: ascending by score (decides which player is revealed next)
+const displayOrder = shuffle(game.players.map(p => ({ ...p, revealed:false })));
+const revealOrder = game.players.slice().sort((a,b)=> (a.score - b.score)); // ascending by score (lowest first)
+
+//
+// Build DOM elements in displayOrder (all hidden with ???)
+//
+const items = {}; // map pid -> { el, data }
+displayOrder.forEach((p, idx) => {
+  const id = pid(p);
+  const div = document.createElement('div');
+  div.className = 'item';
+  div.dataset.pid = id;
+  div.innerHTML = `
+    <div class="line" style="align-items:center;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div class="name">${escapeHtml(p.name)}</div>
+        <div class="muted" style="font-size:12px">joueur</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="score">???</div>
+    </div>
+  `;
+  list.appendChild(div);
+  items[id] = { el: div, data: { ...p, revealed:false } };
+});
+
+// index pointing into revealOrder (which player to reveal next)
+let revealIndex = 0;
+
+// helper: returns array of currently revealed DOM nodes (in DOM order, top->down)
+function getRevealedDOMNodes(){
+  const children = Array.from(list.children);
+  return children.filter(n => n.classList.contains('revealed'));
+}
+
+// FLIP animation helper: move element into parent at position index
+function moveElementTo(parent, element, index) {
+  const firstRect = element.getBoundingClientRect();
+  const refNode = parent.children[index] || null;
+  parent.insertBefore(element, refNode);
+  const lastRect = element.getBoundingClientRect();
+  const dx = firstRect.left - lastRect.left;
+  const dy = firstRect.top - lastRect.top;
+  element.style.transition = 'none';
+  element.style.transform = `translate(${dx}px, ${dy}px)`;
+  // force a reflow then animate back
+  requestAnimationFrame(() => {
+    element.style.transition = 'transform 420ms cubic-bezier(.2,.9,.3,1)';
+    element.style.transform = '';
+  });
+  setTimeout(()=>{
+    element.style.transition = '';
+    element.style.transform = '';
+  }, 460);
+}
+
+// reveal next according to revealOrder (ascending)
+function revealNext(){
+  if (revealIndex >= revealOrder.length) return; // done
+
+  const target = revealOrder[revealIndex];
+  const id = pid(target);
+  const item = items[id];
+  if (!item) { revealIndex++; revealNext(); return; }
+
+  // mark revealed and set score text
+  item.data.revealed = true;
+  const el = item.el;
+  const scoreEl = el.querySelector('.score');
+  scoreEl.textContent = String(target.score);
+  el.classList.add('revealed');
+
+  // Determine insertion position among already revealed nodes so that revealed block is sorted DESC by score
+  const revealedNodes = getRevealedDOMNodes().map(n => {
+    return { node: n, score: Number(n.querySelector('.score')?.textContent || 0) };
+  });
+
+  // find position: we want revealed block sorted descending (highest score at top).
+  // So we find first node where newScore > node.score -> insert before it.
+  const newScore = Number(target.score);
+  let insertPos = 0;
+  while (insertPos < revealedNodes.length && newScore <= revealedNodes[insertPos].score) {
+    insertPos++;
   }
+  // since revealed block is always kept at top contiguous, we can insert at index = insertPos
+  moveElementTo(list, el, insertPos);
 
-  function revealNext() {
-    const next = shuffled.find(p => !p.revealed);
-    if (!next) return;
+  // small delay to show fade-in
+  setTimeout(()=> el.classList.add('visible'), 20);
 
-    next.revealed = true;
+  revealIndex++;
 
-    // Afficher son vrai score
-    const playerDiv = [...document.querySelectorAll(".player")]
-      .find(d => d.dataset.name === next.name);
-    playerDiv.querySelector(".score").textContent = next.score;
-    playerDiv.classList.add("revealed");
-
-    // Réinsérer correctement trié
-    reorderPlayers();
+  // if all revealed now, finalize after a short delay
+  if (revealIndex >= revealOrder.length) {
+    setTimeout(finalizeMedalsAndCrown, 540);
   }
+}
 
-  function reorderPlayers() {
-    const revealedPlayers = shuffled.filter(p => p.revealed);
+// finalize: ensure fully sorted descending, apply medal classes & crown, show controls
+function finalizeMedalsAndCrown(){
+  // collect all items that are revealed
+  const nodes = Array.from(list.children).filter(n => n.classList.contains('revealed'));
+  // build array of {node, score}
+  const arr = nodes.map(n => ({ node: n, score: Number(n.querySelector('.score').textContent || 0) }));
+  // sort desc by score
+  arr.sort((a,b) => b.score - a.score);
+  // apply medal classes and move to final positions with FLIP
+  arr.forEach((it, idx) => {
+    it.node.classList.remove('gold','silver','bronze','has-crown');
+    if (idx === 0) it.node.classList.add('gold');
+    else if (idx === 1) it.node.classList.add('silver');
+    else if (idx === 2) it.node.classList.add('bronze');
+    moveElementTo(list, it.node, idx);
+  });
+  // show controls
+  setTimeout(()=> { controls.style.display = 'flex'; }, 480);
+}
 
-    // Trier seulement les révélés
-    revealedPlayers.sort((a, b) => b.score - a.score);
+// click / touch handlers: reveal next (but ignore clicks on controls/buttons)
+function isClickOnButton(target){
+  return !!target.closest && !!target.closest('.btn');
+}
+document.addEventListener('click', (e) => {
+  if (isClickOnButton(e.target)) return;
+  revealNext();
+}, {passive:true});
+document.addEventListener('touchstart', (e) => {
+  if (isClickOnButton(e.target)) return;
+  revealNext();
+}, {passive:true});
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') revealNext(); });
 
-    revealedPlayers.forEach((p, index) => {
-      const playerDiv = [...document.querySelectorAll(".player")]
-        .find(d => d.dataset.name === p.name);
+// escape helper
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-      resultsContainer.appendChild(playerDiv);
-
-      // Couronne uniquement au premier
-      if (index === 0) {
-        playerDiv.classList.add("leader");
-      } else {
-        playerDiv.classList.remove("leader");
-      }
-    });
-  }
-
-  document.getElementById("revealBtn").addEventListener("click", revealNext);
-
-  renderInitial();
 </script>
 </body>
 </html>
