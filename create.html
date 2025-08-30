@@ -8,117 +8,198 @@
 <style>
   :root{--card:rgba(255,255,255,0.06);--accent:#0ea5e9;--muted:#9ca3af;--white:#eef2ff}
   *{box-sizing:border-box}
-  body{
-    margin:0;min-height:100vh;
-    /* Remplace la ligne ci-dessous par: background-image:url('ton-fond.jpg'); si tu veux une image */
-    background:linear-gradient(180deg,#041226,#071430) fixed;
-    background-repeat:no-repeat;background-size:cover;background-position:center;
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--white);padding:16px
-  }
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#041226,#071430) fixed;font-family:system-ui;color:var(--white);padding:16px}
   .wrap{max-width:720px;margin:0 auto}
   .card{background:var(--card);padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08)}
-  h2{margin:0 0 8px;font-size:18px} .small{font-size:13px;color:var(--muted)}
+  h2{margin:0 0 8px}
+  .small{font-size:13px;color:var(--muted)}
   .players{margin-top:12px;display:flex;flex-direction:column;gap:10px}
-  .row{display:flex;gap:8px}
-  .row input{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:var(--white)}
-  .btn{padding:12px;border-radius:12px;border:0;background:var(--accent);color:#021026;font-weight:800;cursor:pointer}
-  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.12);color:var(--white)}
-  .add-full{margin-top:8px;display:block;width:100%;text-align:center}
-  .actions{display:flex;gap:8px;margin-top:12px}
-  .btn.add-full {display:block;width:100%;padding:12px;border-radius:12px;border:2px dashed rgba(255,255,255,0.08);background:transparent;color:var(--accent);font-weight:800;cursor:pointer;}
-  .btn.add-full:hover { background: rgba(255,255,255,0.02); }
+  .row{display:flex;gap:8px;align-items:center}
+  .row input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:var(--white)}
+  .btn{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:#021026;font-weight:800;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--white)}
+  .add-full{margin-top:10px;display:block;width:100%;text-align:center;padding:10px;border-radius:10px;border:2px dashed rgba(255,255,255,0.08);background:transparent;color:var(--accent);font-weight:900}
+  .meta{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .label{font-size:13px;color:var(--muted)}
+  /* seating circle */
+  .table-wrap{margin-top:14px;display:flex;gap:12px;align-items:center;flex-direction:column}
+  .table-visual{position:relative;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)}
+  .seat-dot{position:absolute;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);font-size:12px;color:var(--white);border:1px solid rgba(255,255,255,0.06)}
+  @media(max-width:520px){ .table-visual{width:200px;height:200px} .seat-dot{width:30px;height:30px;font-size:11px} }
+  .hint{margin-top:8px;color:var(--muted);font-size:13px}
+  .controls{display:flex;gap:8px;margin-top:12px}
+  select,input[type="radio"]{background:transparent;color:var(--white);border:1px solid rgba(255,255,255,0.06);padding:8px;border-radius:8px}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h2>Créer une partie</h2>
-      <div class="small">Ajoute les joueurs (minimum 2).</div>
+      <div class="small">Ajoute les joueurs dans l'ordre du tour de table (sens horaire). Tu peux choisir qui commence ou laisser aléatoire.</div>
 
       <div class="players" id="players"></div>
-      <button id="addBtn" class="btn add-full">+ Ajouter un joueur</button>
 
-      <div class="actions">
-        <button id="startBtn" class="btn">Démarrer</button>
-        <button class="btn ghost" onclick="location.href='index.html'">Annuler</button>
+      <button id="addBtn" class="add-full">+ Ajouter un joueur</button>
+
+      <div class="meta">
+        <div style="display:flex;flex-direction:column">
+          <div class="label">Mode du joueur qui commence</div>
+          <label style="font-size:13px"><input type="radio" name="startMode" value="random" checked> Aléatoire</label>
+          <label style="font-size:13px"><input type="radio" name="startMode" value="manual"> Choisir</label>
+        </div>
+
+        <div id="starterSelectWrap" style="display:flex;flex-direction:column">
+          <div class="label">Si "Choisir", sélectionne le joueur</div>
+          <select id="starterSelect"></select>
+        </div>
       </div>
+
+      <div class="table-wrap">
+        <div class="label">Aperçu de la table</div>
+        <div id="tableVisual" class="table-visual" aria-hidden="true"></div>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" class="btn">Démarrer la partie</button>
+        <button id="cancelBtn" class="btn ghost">Annuler</button>
+      </div>
+      <div id="createHint" class="hint"></div>
     </div>
   </div>
 
 <script>
-/* Config */
-const DECK_SIZE = 66; // ← modifie si besoin
 const LS_GAME = 'skullking_game_v0.21';
-
 const playersEl = document.getElementById('players');
 const addBtn = document.getElementById('addBtn');
 const startBtn = document.getElementById('startBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const starterSelect = document.getElementById('starterSelect');
+const starterWrap = document.getElementById('starterSelectWrap');
+const tableVisual = document.getElementById('tableVisual');
+const createHint = document.getElementById('createHint');
 
 let players = [];
 
-// helper : active/desactive start si doublon ou nom vide
-function checkStartEnabled(){
-  const names = players.map(p => (p.name || '').trim());
-  const hasEmpty = names.some(n => n === '');
-  // detect duplicates (case-insensitive)
-  const lowered = names.map(n => n.toLowerCase());
-  const hasDup = lowered.some((n,i) => n && lowered.indexOf(n) !== i);
-  // disable start if empty or duplicate
-  startBtn.disabled = hasEmpty || hasDup;
-  startBtn.classList.toggle('disabled', startBtn.disabled);
-  // optionally show hint
-  let hint = document.getElementById('createHint');
-  if (!hint){
-    hint = document.createElement('div'); hint.id = 'createHint'; hint.style.marginTop='8px'; hint.style.color='lightyellow';
-    document.querySelector('.card').appendChild(hint);
-  }
-  if (hasEmpty) hint.textContent = 'Noms vides détectés — remplis tous les noms.';
-  else if (hasDup) hint.textContent = 'Deux joueurs ont le même nom — renomme l’un d’eux.';
-  else hint.textContent = '';
-}
-
+// init with two players
 function addPlayer(name=''){
   const id = 'p_'+Math.random().toString(36).slice(2,8);
-  players.push({id, name: name || ''});
+  players.push({ id, name: name || '' });
   render();
 }
 function removePlayer(id){
-  if (players.length<=2) return;
-  players = players.filter(p=>p.id!==id);
+  if (players.length <= 2) return;
+  players = players.filter(p => p.id !== id);
   render();
 }
 function render(){
   playersEl.innerHTML = '';
-  players.forEach((p,i)=>{
-    const row = document.createElement('div'); row.className='row';
-    const input = document.createElement('input'); input.placeholder='Nom du joueur'; input.value=p.name;
-    input.addEventListener('input', e=>{ p.name = e.target.value; checkStartEnabled(); });
-    const minus = document.createElement('button'); minus.className='btn ghost'; minus.textContent='−';
-    minus.disabled = players.length<=2;
-    minus.title = 'Supprimer';
+  players.forEach((p, idx) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const input = document.createElement('input'); input.value = p.name; input.placeholder = `Joueur ${idx+1}`;
+    input.addEventListener('input', (e) => { p.name = e.target.value; updateStarterOptions(); renderTable(); checkStartEnabled(); });
+    const minus = document.createElement('button'); minus.className = 'btn ghost'; minus.textContent = '−';
+    minus.disabled = players.length <= 2;
     minus.addEventListener('click', ()=> removePlayer(p.id));
     row.appendChild(input); row.appendChild(minus);
     playersEl.appendChild(row);
   });
-  // after render, check start
+  updateStarterOptions();
+  renderTable();
   checkStartEnabled();
 }
+
+// seating visual: position dots around circle evenly
+function renderTable(){
+  tableVisual.innerHTML = '';
+  const n = players.length;
+  if (n === 0) return;
+  const rect = tableVisual.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const r = Math.min(cx, cy) - 36; // radius
+  players.forEach((p, i) => {
+    const angle = -Math.PI/2 + (2*Math.PI * i / n); // start at top (-90deg)
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    const dot = document.createElement('div');
+    dot.className = 'seat-dot';
+    dot.style.left = (x - 18) + 'px';
+    dot.style.top = (y - 18) + 'px';
+    dot.textContent = p.name ? p.name.replace(/\s.*$/,'').slice(0,3) : (i+1);
+    tableVisual.appendChild(dot);
+  });
+}
+
+// starter select options
+function updateStarterOptions(){
+  starterSelect.innerHTML = '';
+  players.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name || 'Joueur';
+    starterSelect.appendChild(opt);
+  });
+}
+
+// check start button enabled: at least 2 non-empty names
+function checkStartEnabled(){
+  const names = players.map(p => (p.name||'').trim());
+  const hasEmpty = names.some(n => n === '');
+  startBtn.disabled = hasEmpty || players.length < 2;
+  createHint.textContent = hasEmpty ? 'Remplis tous les noms avant de démarrer.' : '';
+  startBtn.classList.toggle('disabled', startBtn.disabled);
+}
+
+// initial players
 addPlayer('Joueur 1'); addPlayer('Joueur 2');
 
-addBtn.addEventListener('click', ()=> addPlayer());
+// add player
+addBtn.addEventListener('click', ()=> addPlayer(''));
 
-startBtn.addEventListener('click', ()=>{
-  const final = players.map(p=>({id:p.id, name:(p.name||'Joueur').trim(), score:0}));
-  if (final.filter(p=>p.name).length < 2){ alert('Ajoute au moins 2 joueurs.'); return; }
-  // safety: re-check duplicates before starting
-  const names = final.map(p=>p.name.toLowerCase());
-  const dup = names.some((n,i)=> n && names.indexOf(n)!==i);
-  if (dup) { alert('Renomme les joueurs pour qu\'ils soient uniques.'); return; }
-  const totalRounds = Math.min(10, Math.floor(DECK_SIZE / Math.max(1, final.length)));
-  const game = { players:final, currentRound:1, totalRounds, subphase:'bids', savedBids:{} };
-  localStorage.setItem(LS_GAME, JSON.stringify(game));
-  location.href='game.html';
+// starter mode radio handling
+document.querySelectorAll('input[name="startMode"]').forEach(r => {
+  r.addEventListener('change', ()=> {
+    if (r.value === 'manual' && r.checked) starterWrap.style.display = 'flex';
+    if (r.value === 'random' && r.checked) starterWrap.style.display = 'none';
+  });
 });
+// default hide manual select
+starterWrap.style.display = 'none';
+
+// cancel
+cancelBtn.addEventListener('click', ()=> { location.href = 'index.html'; });
+
+// start game
+startBtn.addEventListener('click', ()=> {
+  // validate names
+  const final = players.map(p => ({ id: p.id, name: (p.name||'').trim(), score: 0 }));
+  if (final.filter(p => p.name).length < 2) { alert('Ajoute au moins 2 joueurs avec des noms.'); return; }
+
+  // build game object
+  let startMode = document.querySelector('input[name="startMode"]:checked').value; // 'random' or 'manual'
+  let startPlayerId = null;
+  if (startMode === 'manual') {
+    startPlayerId = starterSelect.value || final[0].id;
+  } else {
+    // random pick now
+    startPlayerId = final[Math.floor(Math.random() * final.length)].id;
+  }
+
+  const DECK_SIZE = 66; // si tu veux modifier
+  const totalRounds = Math.min(10, Math.floor(DECK_SIZE / Math.max(1, final.length)));
+
+  const game = {
+    players: final,
+    currentRound: 1,
+    totalRounds,
+    subphase: 'bids',
+    savedBids: {},
+    startMode,
+    startPlayerId
+  };
+  localStorage.setItem(LS_GAME, JSON.stringify(game));
+  location.href = 'game.html';
+});
+
 </script>
 </body>
 </html>
